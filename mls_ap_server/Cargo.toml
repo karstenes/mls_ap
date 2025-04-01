@@ -4,4 +4,11 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-mls_ap_lib = {path = "../mls_ap_lib"}
+actix-web = { version = "4.10.2", features = ["rustls-0_23"] }
+color-eyre = "0.6.3"
+mls_ap_lib = { path = "../mls_ap_lib" }
+rustls = "0.23.25"
+
+[target.x86_64-unknown-linux-gnu]
+linker = "clang"
+rustflags = ["-C", "link-arg=-fuse-ld=mold"]
