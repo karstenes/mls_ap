@@ -1,0 +1,7 @@
+[package]
+name = "mls_ap_server"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+mls_ap_lib = {path = "../mls_ap_lib"}

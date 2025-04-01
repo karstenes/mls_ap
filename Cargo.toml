@@ -1,0 +1,7 @@
+[workspace]
+members = [
+    "mls_ap_lib",
+    "mls_ap_server",
+]
+
+resolver = "2"
