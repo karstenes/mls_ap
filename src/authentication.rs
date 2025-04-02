@@ -1,6 +1,6 @@
 use ed25519::signature::SignerMut;
-use openmls::prelude::*;
 use ed25519_dalek::{SigningKey, VerifyingKey};
+use openmls::prelude::*;
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
@@ -60,6 +60,7 @@ pub(crate) fn sign_credential_with_state(
         Ok(v) => v,
         Err(e) => return Err(Error::SigningError(e)),
     };
+
     // Return the signed credential.
     Ok(SignedCredential {
         credential: credential.clone(),
