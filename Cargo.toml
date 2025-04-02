@@ -1,12 +1,11 @@
 [package]
-name = "mls_ap_server"
+name = "mls_ap"
 version = "0.1.0"
 edition = "2021"
 
 [dependencies]
 actix-web = { version = "4.10.2", features = ["rustls-0_23"] }
 color-eyre = "0.6.3"
-mls_ap_lib = { path = "../mls_ap_lib" }
 rustls = "0.23.25"
 openmls = "0.6.0"
 openmls_basic_credential = "0.3.0"
@@ -18,6 +17,9 @@ rusqlite = { version = "0.34.0", features = ["bundled"] }
 serde_bytes = "0.11.17"
 ed25519 = { version = "2.2.3", features = ["serde", "serde_bytes"] }
 ed25519-dalek = { version = "2.1.1", features = ["serde"] }
+actix-session = { version = "0.10.1", features = ["cookie-session"] }
+argon2 = "0.5.3"
+rand = "0.7"
 
 [target.x86_64-unknown-linux-gnu]
 linker = "clang"

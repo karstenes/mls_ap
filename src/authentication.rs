@@ -1,8 +1,12 @@
+use super::{Error, Login, UserError};
+use crate::database::{add_user, get_user};
+use argon2::password_hash::{rand_core::OsRng, PasswordHasher, SaltString};
+use argon2::{Argon2, PasswordHash, PasswordVerifier};
 use ed25519::signature::SignerMut;
 use ed25519_dalek::{SigningKey, VerifyingKey};
 use openmls::prelude::*;
+use rustls::Connection;
 use serde::{Deserialize, Serialize};
-use thiserror::Error;
 
 /// Represents a signed credential.
 ///
@@ -21,17 +25,6 @@ pub(crate) struct State {
     pub(crate) private_key: SigningKey,
     /// The public verifying key used for verifying signatures.
     pub(crate) public_key: VerifyingKey,
-}
-
-/// Defines possible errors that can occur during the authentication process.
-#[derive(Error, Debug)]
-pub enum Error {
-    /// Indicates an error occurred while signing the key.
-    #[error("error signing key")]
-    SigningError(ed25519::Error),
-    /// Indicates an error occurred during serialization or deserialization.
-    #[error("serde error")]
-    SerdeError(serde_json::Error),
 }
 
 /// Signs a credential using the provided state.
@@ -66,4 +59,31 @@ pub(crate) fn sign_credential_with_state(
         credential: credential.clone(),
         signed_bytes: credential_signed.to_vec(),
     })
+}
+
+pub(crate) fn register_user(db: &mut rusqlite::Connection, user: Login) -> Result<i64, Error> {
+    let username = user.username;
+
+    let salt = SaltString::generate(&mut OsRng);
+    let argon2 = Argon2::default();
+    let password_hash = match argon2.hash_password(user.password.as_bytes(), &salt) {
+        Ok(v) => v,
+        Err(e) => return Err(Error::HashingError(e)),
+    };
+
+    add_user(db, username, password_hash.to_string())
+}
+
+pub(crate) fn verify_user(db: &rusqlite::Connection, user: Login) -> Result<i64, Error> {
+    let user_db = get_user(&db, &user.username)?;
+
+    let parsed_hash = match PasswordHash::new(&user_db.password_hash) {
+        Ok(v) => v,
+        Err(e) => return Err(Error::HashingError(e)),
+    };
+
+    match Argon2::default().verify_password(&user.password.as_bytes(), &parsed_hash) {
+        Ok(_) => Ok(user_db.id),
+        Err(e) => Err(Error::HashingError(e)),
+    }
 }
