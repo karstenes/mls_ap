@@ -62,7 +62,7 @@ struct AppData {
     crypto_state: authentication::State,
 }
 
-#[derive(Deserialize, Debug, Copy)]
+#[derive(Deserialize, Debug, Clone)]
 pub(crate) struct Login {
     pub(crate) username: String,
     pub(crate) password: String,
@@ -98,11 +98,11 @@ async fn login_user(
 ) -> Result<HttpResponse, actix_web::Error> {
     let mut db = db_mut.db.lock().unwrap();
     let login = data.into_inner();
-
+    let username = login.username.clone();
     match verify_user(&mut db, login) {
         Ok(v) => {
             session.insert("user_id", v)?;
-            session.insert("username", login.username)?;
+            session.insert("username", username)?;
             session.renew();
             Ok(HttpResponse::Ok().json(SessionDetails { user_id: v }))
         }
