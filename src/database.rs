@@ -234,6 +234,8 @@ mod tests {
             &OpenMlsRustCrypto::default(),
         );
 
+        println!("Credential: {:#?}", credential);
+
         let id = add_credential_for_user(&mut db, user.id, &credential).unwrap();
 
         if credential != get_credential(&db, user.id).unwrap() {

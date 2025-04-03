@@ -16,10 +16,10 @@ thiserror = "2.0.12"
 rusqlite = { version = "0.34.0", features = ["bundled"] }
 serde_bytes = "0.11.17"
 ed25519 = { version = "2.2.3", features = ["serde", "serde_bytes"] }
-ed25519-dalek = { version = "2.1.1", features = ["serde"] }
+ed25519-dalek = { version = "2.1.1", features = ["serde", "rand_core"] }
 actix-session = { version = "0.10.1", features = ["cookie-session"] }
 argon2 = "0.5.3"
-rand = "0.7"
+rand_core = "0.6"
 
 [target.x86_64-unknown-linux-gnu]
 linker = "clang"

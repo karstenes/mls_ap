@@ -1,19 +1,19 @@
 use std::{path::PathBuf, sync::Mutex};
 
-use actix_session::{storage::CookieSessionStore, Session, SessionMiddleware};
+use actix_session::{config::PersistentSession, storage::CookieSessionStore, Session, SessionMiddleware};
 use actix_web::{
-    cookie::Key,
+    cookie::{Key, time},
     dev::Payload,
     error::ErrorUnauthorized,
     web::{get, post, Bytes, Data, Form, Json, Path},
     HttpResponse, Responder,
 };
-use rand;
-use ed25519_dalek;
 use authentication::{register_user, sign_credential_with_state, verify_user};
 use color_eyre::owo_colors::OwoColorize;
 use database::{add_credential_for_user, init_database};
+use ed25519_dalek;
 use openmls::prelude::CredentialWithKey;
+use rand_core::OsRng;
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
@@ -57,12 +57,12 @@ pub struct RegisteredUser {
     pub password_hash: String,
 }
 
-struct DbState {
+struct AppData {
     db: Mutex<rusqlite::Connection>,
-    crypto_state: authentication::State
+    crypto_state: authentication::State,
 }
 
-#[derive(Deserialize, Debug)]
+#[derive(Deserialize, Debug, Copy)]
 pub(crate) struct Login {
     pub(crate) username: String,
     pub(crate) password: String,
@@ -77,7 +77,7 @@ fn check_auth(session: &Session) -> Result<i64, actix_web::Error> {
 
 async fn register(
     data: Json<Login>,
-    db_mut: Data<DbState>,
+    db_mut: Data<AppData>,
 ) -> Result<HttpResponse, actix_web::Error> {
     let mut db = db_mut.db.lock().unwrap();
     match register_user(&mut db, data.into_inner()) {
@@ -94,7 +94,7 @@ async fn register(
 async fn login_user(
     session: Session,
     data: Json<Login>,
-    db_mut: Data<DbState>,
+    db_mut: Data<AppData>,
 ) -> Result<HttpResponse, actix_web::Error> {
     let mut db = db_mut.db.lock().unwrap();
     let login = data.into_inner();
@@ -102,6 +102,7 @@ async fn login_user(
     match verify_user(&mut db, login) {
         Ok(v) => {
             session.insert("user_id", v)?;
+            session.insert("username", login.username)?;
             session.renew();
             Ok(HttpResponse::Ok().json(SessionDetails { user_id: v }))
         }
@@ -128,47 +129,72 @@ async fn logout_user(session: Session) -> HttpResponse {
 async fn update_credential(
     session: Session,
     data: Json<CredentialWithKey>,
-    db_mut: Data<DbState>,
+    db_mut: Data<AppData>,
 ) -> Result<HttpResponse, actix_web::Error> {
     let user_id = match check_auth(&session) {
         Ok(v) => v,
         Err(_) => return Ok(HttpResponse::Unauthorized().body("User is not logged in")),
     };
+    let credential = data.into_inner();
+    let credential_name = match String::from_utf8(credential.credential.serialized_content().to_vec()) {
+        Ok(v) => v,
+        Err(_) => return Ok(HttpResponse::InternalServerError().finish())
+    }
+    match session.get::<String>("username") {
+        Ok(Some(username)) => {
+            if username != credential_name {
+                return Ok(HttpResponse::BadRequest().body("Credential identity does not match username"))
+            }
+        },
+        _ => return Ok(HttpResponse::InternalServerError().finish())
+    }
     let mut db = db_mut.db.lock().unwrap();
-    if let Err(_) = add_credential_for_user(&mut db, user_id, &data.into_inner()) {
+    
+    if let Err(_) = add_credential_for_user(&mut db, user_id, &credential) {
         return Ok(HttpResponse::InternalServerError().finish());
     }
 
-    sign_credential_with_state(state, credential)
-
-    Ok(HttpResponse::Ok().body(""))
+    match sign_credential_with_state(&mut db_mut.crypto_state.clone(), &credential) {
+        Ok(v) => Ok(HttpResponse::Ok().json(v)),
+        Err(_) => Ok(HttpResponse::InternalServerError().finish()),
+    }
 }
 
 #[actix_web::main]
 async fn main() -> std::io::Result<()> {
-    let mut rand = rand::rngs::OsRng;
+    let mut rand = OsRng;
     let signing_key = ed25519_dalek::SigningKey::generate(&mut rand);
+
+    let verifying_key = signing_key.verifying_key();
 
     let secret_key = Key::generate();
 
     let db = init_database(&PathBuf::from("db.sql")).unwrap();
 
-    let state = Data::new(DbState { db: Mutex::new(db), crypto_state: authentication::State{
-        private_key: signing_key,
-        public_key: signing_key.verifying_key()
-    } });
+    let state = Data::new(AppData {
+        db: Mutex::new(db),
+        crypto_state: authentication::State {
+            private_key: signing_key,
+            public_key: verifying_key,
+        },
+    });
 
     actix_web::HttpServer::new(move || {
         let logger = actix_web::middleware::Logger::default();
         actix_web::App::new()
-            .wrap(SessionMiddleware::new(
+            .wrap(SessionMiddleware::builder(
                 CookieSessionStore::default(),
                 secret_key.clone(),
-            ))
+            ).session_lifecycle(
+                PersistentSession::default().session_ttl(time::Duration::minutes(5)),
+            )
+            .build())
             .wrap(logger)
             .app_data(state.clone())
             .route("/register", post().to(register))
             .route("/login", post().to(login_user))
+            .route("/update_credential", post().to(update_credential))
+            .route("/logout", post().to(logout_user))
     })
     .bind("0.0.0.0:8080")?
     .run()

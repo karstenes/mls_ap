@@ -20,6 +20,7 @@ pub struct SignedCredential {
 }
 
 /// Holds the state required for signing and verifying credentials.
+#[derive(Debug, Clone)]
 pub(crate) struct State {
     /// The private signing key used for signing credentials.
     pub(crate) private_key: SigningKey,
@@ -41,7 +42,7 @@ pub(crate) struct State {
 /// * `Error::SerdeError` - If serialization of the credential fails.
 pub(crate) fn sign_credential_with_state(
     state: &mut State,
-    credential: CredentialWithKey,
+    credential: &CredentialWithKey,
 ) -> Result<SignedCredential, Error> {
     // Serialize the credential to bytes.
     let credential_bytes = match serde_json::to_string(&credential) {
