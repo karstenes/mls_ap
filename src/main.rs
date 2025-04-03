@@ -139,7 +139,7 @@ async fn update_credential(
     let credential_name = match String::from_utf8(credential.credential.serialized_content().to_vec()) {
         Ok(v) => v,
         Err(_) => return Ok(HttpResponse::InternalServerError().finish())
-    }
+    };
     match session.get::<String>("username") {
         Ok(Some(username)) => {
             if username != credential_name {
