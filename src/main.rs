@@ -2,20 +2,16 @@ use std::{path::PathBuf, sync::Mutex};
 
 use actix_session::{config::PersistentSession, storage::CookieSessionStore, Session, SessionMiddleware};
 use actix_web::{
-    cookie::{Key, time},
-    dev::Payload,
-    error::ErrorUnauthorized,
-    web::{get, post, Bytes, Data, Form, Json, Path},
-    HttpResponse, Responder,
+    cookie::{time, Key}, error::ErrorUnauthorized, web::{post, Data, Json}, App, HttpResponse
 };
 use authentication::{register_user, sign_credential_with_state, verify_user};
-use color_eyre::owo_colors::OwoColorize;
 use database::{add_credential_for_user, init_database};
 use ed25519_dalek;
 use openmls::prelude::CredentialWithKey;
 use rand_core::OsRng;
-use serde::{Deserialize, Serialize};
+use serde::Deserialize;
 use thiserror::Error;
+use base64::prelude::*;
 
 mod authentication;
 mod database;
@@ -160,6 +156,10 @@ async fn update_credential(
     }
 }
 
+async fn get_pubkey(state: Data<AppData>) -> HttpResponse {
+    return HttpResponse::Ok().body(BASE64_STANDARD.encode(state.crypto_state.public_key));
+}
+
 #[actix_web::main]
 async fn main() -> std::io::Result<()> {
     let mut rand = OsRng;
@@ -195,6 +195,7 @@ async fn main() -> std::io::Result<()> {
             .route("/login", post().to(login_user))
             .route("/update_credential", post().to(update_credential))
             .route("/logout", post().to(logout_user))
+            .route("/get_public_key", get().to(get_pubkey))
     })
     .bind("0.0.0.0:8080")?
     .run()

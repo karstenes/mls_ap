@@ -141,10 +141,10 @@ pub fn add_user(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use openmls::prelude::*;
+    
     use openmls_basic_credential::SignatureKeyPair;
     use openmls_rust_crypto::OpenMlsRustCrypto;
-    use std::path::PathBuf;
+    
 
     fn generate_credential_with_key(
         identity: Vec<u8>,

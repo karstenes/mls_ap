@@ -1,11 +1,10 @@
-use super::{Error, Login, UserError};
+use super::{Error, Login};
 use crate::database::{add_user, get_user};
 use argon2::password_hash::{rand_core::OsRng, PasswordHasher, SaltString};
 use argon2::{Argon2, PasswordHash, PasswordVerifier};
 use ed25519::signature::SignerMut;
 use ed25519_dalek::{SigningKey, VerifyingKey};
 use openmls::prelude::*;
-use rustls::Connection;
 use serde::{Deserialize, Serialize};
 
 /// Represents a signed credential.
