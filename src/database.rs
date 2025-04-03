@@ -148,7 +148,6 @@ mod tests {
 
     fn generate_credential_with_key(
         identity: Vec<u8>,
-        credential_type: CredentialType,
         signature_algorithm: SignatureScheme,
         provider: &impl OpenMlsProvider,
     ) -> (CredentialWithKey, SignatureKeyPair) {
@@ -227,16 +226,15 @@ mod tests {
 
         let user = get_user(&db, &"testuser".to_string()).unwrap();
 
-        let (credential, signer) = generate_credential_with_key(
+        let (credential, _) = generate_credential_with_key(
             "Sasha".into(),
-            CredentialType::Basic,
             Ciphersuite::MLS_128_DHKEMX25519_AES128GCM_SHA256_Ed25519.signature_algorithm(),
             &OpenMlsRustCrypto::default(),
         );
 
         println!("Credential: {:#?}", credential);
 
-        let id = add_credential_for_user(&mut db, user.id, &credential).unwrap();
+        add_credential_for_user(&mut db, user.id, &credential).unwrap();
 
         if credential != get_credential(&db, user.id).unwrap() {
             panic!("Credentials don't match!")

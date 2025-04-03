@@ -2,7 +2,7 @@ use std::{path::PathBuf, sync::Mutex};
 
 use actix_session::{config::PersistentSession, storage::CookieSessionStore, Session, SessionMiddleware};
 use actix_web::{
-    cookie::{time, Key}, error::ErrorUnauthorized, web::{post, Data, Json}, App, HttpResponse
+    cookie::{time, Key}, error::ErrorUnauthorized, web::{get, post, Data, Json}, HttpResponse
 };
 use authentication::{register_user, sign_credential_with_state, verify_user};
 use database::{add_credential_for_user, init_database};
