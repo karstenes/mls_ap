@@ -7,7 +7,7 @@ use actix_web::{
 use authentication::{register_user, sign_credential_with_state, verify_user};
 use database::{add_credential_for_user, init_database};
 use ed25519_dalek;
-use openmls::prelude::CredentialWithKey;
+use openmls::prelude::{CredentialWithKey, tls_codec::*};
 use rand_core::OsRng;
 use serde::Deserialize;
 use thiserror::Error;
@@ -80,7 +80,7 @@ async fn register(
         Ok(_) => Ok(HttpResponse::Ok().finish()),
         Err(e) => match e {
             Error::UserError(UserError::UserExistsError(s)) => {
-                Ok(HttpResponse::BadRequest().body(s))
+                Ok(HttpResponse::Ok().finish())
             }
             _ => Ok(HttpResponse::InternalServerError().finish()),
         },
@@ -167,6 +167,8 @@ async fn main() -> std::io::Result<()> {
 
     let verifying_key = signing_key.verifying_key();
 
+    println!("Pubkey: {}", BASE64_STANDARD.encode(verifying_key.as_bytes()));
+
     let secret_key = Key::generate();
 
     let db = init_database(&PathBuf::from("db.sql")).unwrap();
@@ -179,6 +181,8 @@ async fn main() -> std::io::Result<()> {
         },
     });
 
+    env_logger::init_from_env(env_logger::Env::new().default_filter_or("info"));
+    
     actix_web::HttpServer::new(move || {
         let logger = actix_web::middleware::Logger::default();
         actix_web::App::new()
@@ -197,7 +201,7 @@ async fn main() -> std::io::Result<()> {
             .route("/logout", post().to(logout_user))
             .route("/get_public_key", get().to(get_pubkey))
     })
-    .bind("0.0.0.0:8080")?
+    .bind(("0.0.0.0", 8081))?
     .run()
     .await
 }
