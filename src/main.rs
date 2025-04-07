@@ -1,4 +1,4 @@
-use std::{path::PathBuf, sync::Mutex};
+use std::{fs::File, path::PathBuf, sync::Mutex};
 
 use actix_session::{config::PersistentSession, storage::CookieSessionStore, Session, SessionMiddleware};
 use actix_web::{
@@ -12,6 +12,10 @@ use rand_core::OsRng;
 use serde::Deserialize;
 use thiserror::Error;
 use base64::prelude::*;
+use std::path::Path;
+use std::io::prelude::*;
+use std::env;
+use dotenvy;
 
 mod authentication;
 mod database;
@@ -162,8 +166,24 @@ async fn get_pubkey(state: Data<AppData>) -> HttpResponse {
 
 #[actix_web::main]
 async fn main() -> std::io::Result<()> {
+    let _ = dotenvy::dotenv();
+
     let mut rand = OsRng;
-    let signing_key = ed25519_dalek::SigningKey::generate(&mut rand);
+    
+    let signing_key =  if let Ok(x) = env::var("PRIVATE_KEY") {
+        let key_bytes: [u8;32] = BASE64_STANDARD.decode(x).unwrap().try_into().unwrap();
+        ed25519_dalek::SigningKey::from_bytes(&key_bytes)
+    } else {
+        let path = Path::new("./.env");
+        let mut file =  if path.exists() {
+            File::open(path).unwrap()
+        } else {
+            File::create(path).unwrap()
+        };
+        let key = ed25519_dalek::SigningKey::generate(&mut rand);
+        write!(&mut file, "PRIVATE_KEY={}", BASE64_STANDARD.encode(key.as_bytes())).unwrap();
+        key
+    };
 
     let verifying_key = signing_key.verifying_key();
 
